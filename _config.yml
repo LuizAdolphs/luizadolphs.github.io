@@ -75,11 +75,9 @@ pagination_dir: page
 theme: anatole
 
 # Deployment
-## Docs: http://hexo.io/docs/deployment.html
+## Docs: https://hexo.io/docs/deployment.html
 deploy:
-  type: git
-  repo: git@github.com:luizadolphs/luizadolphs.github.io.git
-  branch: development
+  type:
 
 # Blog
 keywords: Hexo,HTML,CSS,android,Linux
