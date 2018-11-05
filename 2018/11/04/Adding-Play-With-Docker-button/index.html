@@ -1,0 +1,109 @@
+<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Luiz Adolphs"><title>Adding Play With Docker button · Luiz Adolphs</title><meta name="description" content="Hello folks!
+It has been a while that I didn’t write anything, but this sunday I found something very nice to share about inside Oren Yomtov’s Medium "><meta name="keywords" content=".NET, ASP.NET,.NET CORE, ReactJS, AngularJS, Containers, Docker"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/vs2015.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/cs.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/bash.min.js"></script></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo.png" style="width:127px;"><h3 title=""><a href="/">Luiz Adolphs</a></h3><div class="description"><p>Programação e Legalzises!</p></div></div></div><ul class="social-links"><li><a href="https://twitter.com/luizadolphs"><i class="fa fa-twitter"></i></a></li><li><a href="http://facebook.com/luiz.adolphs.junior"><i class="fa fa-facebook"></i></a></li><li><a href="http://github.com/LuizAdolphs"><i class="fa fa-github"></i></a></li></ul><div class="footer"><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div><script>$(document).ready(function(){
+  hljs.initHighlightingOnLoad();
+});</script></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">Home</a></li><li><a href="/about">About</a></li><li><a href="/archives">Archive</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"> </a></li></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>Adding Play With Docker button</a></h3></div><div class="post-content"><p>Hello folks!</p>
+<p>It has been a while that I didn’t write anything, but this sunday I found something very nice to share about inside <a href="https://medium.com/@patternrecognizer/how-to-add-a-try-in-play-with-docker-button-to-your-github-project-41cb65721e94" target="_blank" rel="noopener">Oren Yomtov’s Medium article</a>, which is a simple way to test a software: run it inside “Play With Docker”.</p>
+<p>I’m a huge fan of the <a href="https://labs.play-with-docker.com/" target="_blank" rel="noopener">Play With Docker</a> (PWD) for at least two big reasons:</p>
+<ol>
+<li>You can try images and softwares very quickly since you don’t have to install Docker, docker-compose or even kubernetes (try <a href="https://labs.play-with-k8s.com/" target="_blank" rel="noopener">Play With Kubernetes</a>).</li>
+<li>Computer resources can be spared, so your machine will not handle any heavy worload (or deal with virtualization configuration).</li>
+</ol>
+<p>It’s possible to try almost any software inside PWD (maybe all of them, I don’t have sure, but still it’s a lot!). But one limitation is that one person should know how to clone repos, run docker images and so on…</p>
+<p>But now PWD can read an online <code>Dockerfile</code> or <code>docker-compose</code> file within GitHub, for example. So I decided to try it out.</p>
+<p>I have my <a href="https://github.com/LuizAdolphs/DiffTool" target="_blank" rel="noopener">DiffTool proof-of-concept</a> project inside GitHub, which uses <code>docker-compose</code> to up and run two containers (one is the API service, other is UI web app service). My <code>docker-compose.yml</code> file was like that:</p>
+<pre><code class="yaml">version: &#39;3&#39;
+services:
+  api:
+    build: ./api
+    ports:
+      - &quot;5000:5000&quot;
+  web:
+    build: ./app
+    ports:
+      - &quot;80:80&quot;
+</code></pre>
+<p>Where I was configuring two services using distinct Dockerfiles. This repository was perfect to test PWD on-the-fly button.</p>
+<p>But, after some tentatives (where you can find <a href="https://github.com/LuizAdolphs/DiffTool/commits/master" target="_blank" rel="noopener">here</a>), I found out that was simpler to build and pull both images to Docker repository and run them with a docker compose file.</p>
+<p>So I adjust my <code>.travis.yml</code> to build and pull my docker images:</p>
+<pre><code class="yaml">    - language: generic
+      dist: trusty
+      sudo: true
+      script:
+      - echo &quot;$DOCKER_PASSWORD&quot; | docker login -u &quot;$DOCKER_USERNAME&quot; --password-stdin
+      - docker build -t difftoolapi ./api
+      - docker images
+      - docker tag difftoolapi $DOCKER_USERNAME/difftoolapi
+      - docker push $DOCKER_USERNAME/difftoolapi
+      - docker build -t difftoolapp ./app
+      - docker images
+      - docker tag difftoolapp $DOCKER_USERNAME/difftoolapp
+      - docker push $DOCKER_USERNAME/difftoolapp
+</code></pre>
+<p>Whole file:</p>
+<pre><code class="yaml">matrix:
+  include:
+    - language: csharp
+      dist: trusty
+      mono: none
+      dotnet: 2.0.0
+      install:
+        - cd api/
+        - dotnet restore
+      script:
+        - cd ../test/api/
+        - dotnet build
+        - dotnet test 
+    - language: node_js
+      dist: trusty
+      node_js:
+        - &quot;9&quot;
+      install:
+        - cd app/
+        - yarn install
+      script:
+        - yarn test 
+    - language: generic
+      dist: trusty
+      sudo: true
+      script:
+      - echo &quot;$DOCKER_PASSWORD&quot; | docker login -u &quot;$DOCKER_USERNAME&quot; --password-stdin
+      - docker build -t difftoolapi ./api
+      - docker images
+      - docker tag difftoolapi $DOCKER_USERNAME/difftoolapi
+      - docker push $DOCKER_USERNAME/difftoolapi
+      - docker build -t difftoolapp ./app
+      - docker images
+      - docker tag difftoolapp $DOCKER_USERNAME/difftoolapp
+      - docker push $DOCKER_USERNAME/difftoolapp
+</code></pre>
+<p>As you can see, I made use of the <a href="https://docs.travis-ci.com/user/languages/minimal-and-generic/" target="_blank" rel="noopener">generic language image</a> to have Docker CLI and <a href="https://docs.travis-ci.com/user/environment-variables/" target="_blank" rel="noopener">Travis enviroment variables</a> to keep my docker username and password in secret. The whole idea was took from <a href="https://docs.travis-ci.com/user/build-stages/share-docker-image/" target="_blank" rel="noopener">here</a>.</p>
+<p>Now, after any master branch pull is made, a newer release of that image is pulled too.</p>
+<p>So now I’m able to write a new <code>.yml</code> file exclusive to PWD, which I’ve called <code>pwd-docker-compose.yml</code>:</p>
+<pre><code class="yaml">version: &#39;3&#39;
+services:
+  api:
+    image: &quot;adolphsluiz/difftoolapi:latest&quot;
+    ports:
+      - &quot;5000:5000&quot;
+  web:
+    image: &quot;adolphsluiz/difftoolapp:latest&quot;
+    ports:
+      - &quot;80:80&quot;
+</code></pre>
+<p>The last step is to add the markdown code with the button link in README.md:</p>
+<pre><code class="markdown">[![Try in PWD](https://raw.githubusercontent.com/play-with-docker/stacks/master/assets/images/button.png)](https://labs.play-with-docker.com/?stack=https://raw.githubusercontent.com/LuizAdolphs/DiffTool/master/pwd-docker-compose.yml)
+</code></pre>
+<p>Where it says <code>https://raw.githubusercontent.com/LuizAdolphs/DiffTool/master/pwd-docker-compose.yml</code> you must replace with your compose public URL.</p>
+<p>And this is the result:</p>
+<p><img src="/images/button-pwd.png" alt="PWD button in README github page"></p>
+<p>Now just click in the button to be redirected to PWD webpage (which probably you need to logon using a docker account) running the repository stack!</p>
+<p>That’s it! Thanks for all referenced folks and webpages in this article! See you next time!</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2018-11-04</span><i class="fa fa-comment-o"></i><a href="/2018/11/04/Adding-Play-With-Docker-button/#comments">Comments</a><i class="fa fa-tag"></i><a href="/tags/docker/" title="docker" class="tag">docker </a></div></div></div></div><div class="share"><div class="evernote"><a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"><a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"><a href="http://twitter.com/home?status=,https://luizadolphs.github.io/2018/11/04/Adding-Play-With-Docker-button/,Luiz Adolphs,Adding Play With Docker button,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a role="navigation" href="/2018/01/02/Playing-with-reactive-collections-in-c/" title="Playing with reactive collections in C#" class="btn">Next Post</a></li></ul></div><a id="comments"></a><div id="disqus_thread"></div><script>var disqus_shortname = 'http-luizadolphs-github-io';
+var disqus_identifier = '2018/11/04/Adding-Play-With-Docker-button/';
+var disqus_title = 'Adding Play With Docker button';
+var disqus_url = 'https://luizadolphs.github.io/2018/11/04/Adding-Play-With-Docker-button/';
+(function() {
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();</script><script id="dsq-count-scr" src="//http-luizadolphs-github-io.disqus.com/count.js" async></script></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>

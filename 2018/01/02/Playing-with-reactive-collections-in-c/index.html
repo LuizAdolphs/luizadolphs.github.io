@@ -1,0 +1,379 @@
+<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Luiz Adolphs"><title>Playing with reactive collections in C# · Luiz Adolphs</title><meta name="description" content="Hello folks!
+Few days ago I was writing some exercices in C# and I notice an interesting behavior about IEnumerable and IQueryable.Observe the followi"><meta name="keywords" content=".NET, ASP.NET,.NET CORE, ReactJS, AngularJS, Containers, Docker"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/vs2015.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/cs.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/bash.min.js"></script></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo.png" style="width:127px;"><h3 title=""><a href="/">Luiz Adolphs</a></h3><div class="description"><p>Programação e Legalzises!</p></div></div></div><ul class="social-links"><li><a href="https://twitter.com/luizadolphs"><i class="fa fa-twitter"></i></a></li><li><a href="http://facebook.com/luiz.adolphs.junior"><i class="fa fa-facebook"></i></a></li><li><a href="http://github.com/LuizAdolphs"><i class="fa fa-github"></i></a></li></ul><div class="footer"><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div><script>$(document).ready(function(){
+  hljs.initHighlightingOnLoad();
+});</script></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">Home</a></li><li><a href="/about">About</a></li><li><a href="/archives">Archive</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"> </a></li></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>Playing with reactive collections in C#</a></h3></div><div class="post-content"><p>Hello folks!</p>
+<p>Few days ago I was writing some exercices in C# and I notice an interesting behavior about IEnumerable and IQueryable.<br>Observe the following code:</p>
+<pre><code class="csharp">using System;
+using System.Linq;
+using System.Collections;
+
+namespace reactiveCollection
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            IEnumerable collection = Enumerable.Range(0,10);
+
+            foreach (int item in collection)
+            {
+                Console.WriteLine(item);
+            }
+
+            Console.ReadLine();
+        }
+    }
+}
+</code></pre>
+<p>Quite simple, and if we runt it in terminal, we get the following response:</p>
+<pre><code class="bash">root@1083f7cca7e3:/app# dotnet run
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+</code></pre>
+<p>Well, I guess we all were expecting that response, but what if we change our collection structure from <code>IEnumerable</code> to <code>IQueryable</code>?</p>
+<pre><code class="csharp">using System;
+using System.Linq;
+using System.Collections;
+
+namespace reactiveCollection
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            IEnumerable collection = Enumerable.Range(0,10).Select(x =&gt; x);
+
+            foreach (int item in collection)
+            {
+                Console.WriteLine(item);
+            }
+
+            Console.ReadLine();
+        }
+    }
+}
+</code></pre>
+<pre><code class="bash">root@1083f7cca7e3:/app# dotnet run
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+</code></pre>
+<p>Basically the same thing. Now let’s put some interaction with the user inside the expression:</p>
+<pre><code class="csharp">using System;
+using System.Linq;
+using System.Collections;
+
+namespace reactiveCollection
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            IEnumerable collection = Enumerable
+                .Range(0,10)
+                .Select(x =&gt; 
+                {
+                    Console.ReadLine();
+
+                    return x;
+                });
+
+            foreach (int item in collection)
+            {
+                Console.WriteLine(item);
+            }
+
+            Console.ReadLine();
+        }
+    }
+}
+</code></pre>
+<p>Result:</p>
+<pre><code class="bash">root@1083f7cca7e3:/app# dotnet run
+
+
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+</code></pre>
+<p>Something interesting happens… I would usually expect pressing Enter button 10 times for after that the <code>foreach</code> print the numbers each line like the previous code.</p>
+<p>But is not what occurs… Each <code>foreach</code> interaction, the instruction passed to <code>Select</code> command (which is <code>Console.ReadLine()</code>) is executed… That happens because <code>Enumerables</code> (and by consequence <code>IQueryables</code>) only execute expressions when they are returned by <code>yield</code> (see more about <code>yield</code> bellow).</p>
+<p>Another exemple about what`s happening. Observe the following code:</p>
+<pre><code class="csharp">
+using System;
+using System.Linq;
+using System.Collections;
+
+namespace reactiveCollection
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            IEnumerable collection = Enumerable
+                .Range(0,10)
+                .Select(x =&gt; 
+                {
+                    Console.WriteLine($&quot;---------------------------Executing inside the Select at { DateTime.Now.ToLongTimeString()}&quot;);
+
+                    return x;
+                });
+
+            foreach (int item in collection)
+            {
+                Console.WriteLine($&quot;Executing outsite the Select at { DateTime.Now.ToLongTimeString()}&quot;);
+            }
+
+            Console.ReadLine();
+        }
+    }
+}
+</code></pre>
+<p>And the result is:</p>
+<pre><code class="bash">
+root@1083f7cca7e3:/app# dotnet run
+---------------------------Executing inside the Select at 15:00:12
+Executing outsite the Select 15:00:13
+---------------------------Executing inside the Select at 15:00:13
+Executing outsite the Select 15:00:14
+---------------------------Executing inside the Select at 15:00:14
+Executing outsite the Select 15:00:15
+---------------------------Executing inside the Select at 15:00:15
+Executing outsite the Select 15:00:16
+---------------------------Executing inside the Select at 15:00:16
+Executing outsite the Select 15:00:17
+---------------------------Executing inside the Select at 15:00:17
+Executing outsite the Select 15:00:18
+---------------------------Executing inside the Select at 15:00:18
+Executing outsite the Select 15:00:19
+---------------------------Executing inside the Select at 15:00:19
+Executing outsite the Select 15:00:20
+---------------------------Executing inside the Select at 15:00:20
+Executing outsite the Select 15:00:21
+---------------------------Executing inside the Select at 15:00:21
+Executing outsite the Select 15:00:22
+</code></pre>
+<p>These results indicate that, each interaction, the internal method passed to <code>Select</code> statement is executed.</p>
+<p>This behavior give us some advantages in terms of processing. If the passed method is, for example, a heavy processing call, it would be executed when needed. If the loop were for some reason interrupted, lot of processing would be avoided.</p>
+<p>When there’s need to execute the entire loop (and each preposition passed into <code>Select</code> statement) before iterate, just need to force it execution, like calling the <code>.ToList()</code> extension:</p>
+<pre><code class="csharp">
+using System;
+using System.Linq;
+using System.Collections;
+
+namespace reactiveCollection
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            IEnumerable collection = Enumerable
+                .Range(0,10)
+                .Select(x =&gt; 
+                {
+                    Console.WriteLine($&quot;---------------------------Executing inside the Select at { DateTime.Now.ToLongTimeString()}&quot;);
+
+                    return x;
+                })
+                .ToList();
+
+            foreach (int item in collection)
+            {
+                Console.WriteLine($&quot;Executing outsite the Select at { DateTime.Now.ToLongTimeString()}&quot;);
+            }
+
+            Console.ReadLine();
+        }
+    }
+}
+</code></pre>
+<p>And the result becomes:</p>
+<pre><code class="bash">
+root@1083f7cca7e3:/app# dotnet run
+---------------------------Executing inside the Select at 15:01:21
+---------------------------Executing inside the Select at 15:01:22
+---------------------------Executing inside the Select at 15:01:23
+---------------------------Executing inside the Select at 15:01:24
+---------------------------Executing inside the Select at 15:01:25
+---------------------------Executing inside the Select at 15:01:26
+---------------------------Executing inside the Select at 15:01:27
+---------------------------Executing inside the Select at 15:01:28
+---------------------------Executing inside the Select at 15:01:29
+---------------------------Executing inside the Select at 15:01:30
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+Executing outsite the Select 15:01:31
+</code></pre>
+<p>We can realize that the total time of both executions is basically the same. But the console output is completely different.</p>
+<p>This is the source code of the <code>.Select</code> method inside <a href="https://github.com/dotnet/corefx/blob/master/src/System.Linq/src/System/Linq/Select.cs" target="_blank" rel="noopener"><code>System.Linq</code></a>. We can see the <code>yield return</code> instruction that basically indicates a point of return in each interaction, and interactions were made only when they are needed (accordingly with the size of collection or N times before a break statement).</p>
+<pre><code class="csharp">
+private static IEnumerable&lt;TResult&gt; SelectIterator&lt;TSource, TResult&gt;(IEnumerable&lt;TSource&gt; source, Func&lt;TSource, int, TResult&gt; selector)
+{
+    int index = -1;
+    foreach (TSource element in source)
+    {
+        checked
+        {
+            index++;
+        }
+
+        yield return selector(element, index);
+    }
+}
+</code></pre>
+<h3 id="But-why-can-we-say-this-code-is-Reactive"><a href="#But-why-can-we-say-this-code-is-Reactive" class="headerlink" title="But why can we say this code is Reactive?"></a>But why can we say this code is Reactive?</h3><p>When we iterate a collection, like in our example, we can have two kinds of behaviors: Reactive and Pro-active.</p>
+<p>Pro-active is when all the possible results are calculated before they were requested. It’s what happened in our last loop example when we added <code>.ToList()</code> method call. All collection results were calculated before iterate them. That’s why the following <code>foreach</code> loop shown only the <code>Console.Write</code> result in console.</p>
+<p>But the Reactive aproach executes every item of collection and returns its results each interaction. We can say that there is a “Reaction” inside the collection that executes the current item at time.</p>
+<h3 id="A-more-complex-example"><a href="#A-more-complex-example" class="headerlink" title="A more complex example"></a>A more complex example</h3><p>For this example we will use the <a href="https://www.pokeapi.co" target="_blank" rel="noopener">Pokémon</a> API because it’s free and don’t need any authentication. Let’s implement a program that shows only the 10 first pokemons, but stop showing when the first “fire” type pokemon is listed. First, let’s try the pro-active approach:</p>
+<pre><code class="csharp">using static Newtonsoft.Json.JsonConvert;
+using System;
+using System.Linq;
+using System.Collections;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Diagnostics;
+
+namespace reactiveCollection
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            var stopWatch = new Stopwatch();
+
+            stopWatch.Start();
+
+            using(var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue(&quot;application/json&quot;));
+
+                IEnumerable&lt;Pokemon&gt; pokemons = Enumerable
+                .Range(1,11)
+                .Select(x =&gt; 
+                {
+                    var result = client.GetAsync($&quot;http://pokeapi.co/api/v2/pokemon/{x}&quot;).Result; 
+
+                    return DeserializeObject&lt;Pokemon&gt;(result.Content.ReadAsStringAsync().Result);
+                })
+                .ToList();   
+
+                foreach(var pokemon in pokemons)
+                {
+                    Console.WriteLine(pokemon.Name);
+
+                    if(pokemon.Types.Any(x =&gt; x.Type.Name.ToLower() == &quot;fire&quot;))
+                        break;
+                }
+
+            }
+
+            stopWatch.Stop();
+
+            Console.WriteLine($&quot;Execution Duration: {stopWatch.Elapsed.Seconds} seconds&quot;);
+        }
+    }
+    public class Pokemon
+    {
+        public string Name { get; set; }
+        public IList&lt;PokemonTypeSlot&gt; Types { get; set; }
+
+        public class PokemonTypeSlot
+        {
+            public int Slot { get; set; }
+            public PokemonType Type { get; set; }
+            public class PokemonType {
+                public string Name { get; set; }
+            }
+        }
+    }
+}
+</code></pre>
+<p>Results:</p>
+<pre><code class="bash">root@1083f7cca7e3:/app# dotnet run
+bulbasaur
+ivysaur
+venusaur
+charmander
+Execution Duration: 36 seconds
+</code></pre>
+<p>Now let’s remove only <code>.ToList()</code> and allow the API call only be made in each interaction (I will show only the part of code):</p>
+<pre><code class="csharp">...
+                IEnumerable&lt;Pokemon&gt; pokemons = Enumerable
+                .Range(1,11)
+                .Select(x =&gt; 
+                {
+                    var result = client.GetAsync($&quot;http://pokeapi.co/api/v2/pokemon/{x}&quot;).Result; 
+
+                    return DeserializeObject&lt;Pokemon&gt;(result.Content.ReadAsStringAsync().Result);
+                });   
+
+                foreach(var pokemon in pokemons)
+                {
+                    Console.WriteLine(pokemon.Name);
+
+                    if(pokemon.Types.Any(x =&gt; x.Type.Name.ToLower() == &quot;fire&quot;))
+                        break;
+                }
+...
+</code></pre>
+<p>The result is very different:</p>
+<pre><code class="bash">root@1083f7cca7e3:/app# dotnet run
+bulbasaur
+ivysaur
+venusaur
+charmander
+Execution Duration: 10 seconds
+</code></pre>
+<p>Of course there are better ways to retrieve the same info from the API, but my intend is to show the concept.</p>
+<h3 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h3><p>Reactive or Pro-active aproachs are diffents ways to obtain results in a timeline. It’s not right to say one is better than other, because it depends by what is needed to be done. The most important thing here is to undestand their differences.</p>
+<p>If you wish, you can check my code here <a href="https://github.com/LuizAdolphs/blog/tree/master/codes/reactiveCollection" target="_blank" rel="noopener">aqui</a></p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2018-01-02</span><i class="fa fa-comment-o"></i><a href="/2018/01/02/Playing-with-reactive-collections-in-c/#comments">Comments</a><i class="fa fa-tag"></i><a href="/tags/csharp/" title="csharp" class="tag">csharp </a></div></div></div></div><div class="share"><div class="evernote"><a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"><a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"><a href="http://twitter.com/home?status=,https://luizadolphs.github.io/2018/01/02/Playing-with-reactive-collections-in-c/,Luiz Adolphs,Playing with reactive collections in C#,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2018/11/04/Adding-Play-With-Docker-button/" title="Adding Play With Docker button" class="btn">Previous Post</a></li><li class="next pagbuttons"><a role="navigation" href="/2017/12/12/Brincando-com-colecoes-reativas-em-c/" title="Brincando com coleções reativas em c#" class="btn">Next Post</a></li></ul></div><a id="comments"></a><div id="disqus_thread"></div><script>var disqus_shortname = 'http-luizadolphs-github-io';
+var disqus_identifier = '2018/01/02/Playing-with-reactive-collections-in-c/';
+var disqus_title = 'Playing with reactive collections in C#';
+var disqus_url = 'https://luizadolphs.github.io/2018/01/02/Playing-with-reactive-collections-in-c/';
+(function() {
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();</script><script id="dsq-count-scr" src="//http-luizadolphs-github-io.disqus.com/count.js" async></script></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
